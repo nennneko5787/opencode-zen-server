@@ -1,0 +1,36 @@
+name: publish
+
+# Publish to PyPI when a version tag is pushed:
+#
+#   uv version 0.1.1 && uv build && git tag v0.1.1 && git push --tags
+#
+# Uses PyPI Trusted Publishing, so there is no API token to store anywhere: the
+# short-lived OIDC token in this job is exchanged by PyPI once the publisher is
+# registered for this repository (one-time setup on pypi.org, see the README).
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    uses: ./.github/workflows/ci.yml
+
+  pypi:
+    name: upload to PyPI
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      # Required for Trusted Publishing.
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - run: uv build
+      - run: uvx twine check --strict dist/*
+      # --check-url refuses to overwrite an existing release, since PyPI filenames
+      # are immutable and a re-upload always fails.
+      - run: uv publish --check-url https://pypi.org/simple/

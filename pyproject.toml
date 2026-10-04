@@ -1,0 +1,59 @@
+[project]
+name = "zen-free-proxy"
+version = "0.1.0"
+description = "OpenAI-compatible reverse proxy for the free models on OpenCode Zen, with a self-updating model catalog"
+readme = "README.md"
+requires-python = ">=3.12"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "nennneko5787" }]
+keywords = ["opencode", "zen", "proxy", "openai", "llm", "free-models", "models-dev"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Framework :: FastAPI",
+    "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Internet :: Proxy Servers",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Typing :: Typed",
+]
+dependencies = [
+    "fastapi>=0.115",
+    "httpx>=0.27",
+    "pydantic-settings>=2.6",
+    "uvicorn[standard]>=0.32",
+]
+
+[project.urls]
+Homepage = "https://github.com/nennneko5787/opencode-zen-server"
+Repository = "https://github.com/nennneko5787/opencode-zen-server"
+Issues = "https://github.com/nennneko5787/opencode-zen-server/issues"
+
+[project.scripts]
+zen-free-proxy = "zen_free_proxy.__main__:main"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3",
+    "pytest-asyncio>=0.24",
+    "ruff>=0.7",
+]
+
+[build-system]
+requires = ["uv_build>=0.11.16,<0.12.0"]
+build-backend = "uv_build"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 110
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
