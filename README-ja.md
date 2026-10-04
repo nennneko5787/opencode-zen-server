@@ -300,7 +300,7 @@ PyPI へは Trusted Publishing で公開しています（API トークンはど
 `v*` タグを push すると、CI を通って自動でアップロードされます:
 
 ```bash
-uv version patch          # 0.1.0 -> 0.1.1（pyproject.toml を更新）
+uv version --bump patch     # 0.1.0 -> 0.1.1（pyproject.toml を更新）
 git commit -am "release 0.1.1" && git push
 git tag v0.1.1 && git push --tags
 ```

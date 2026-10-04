@@ -316,7 +316,7 @@ Publishing to PyPI goes through Trusted Publishing, so there is no API token sto
 anywhere. Push a `v*` tag and CI uploads the release:
 
 ```bash
-uv version patch          # 0.1.0 -> 0.1.1 in pyproject.toml
+uv version --bump patch     # 0.1.0 -> 0.1.1 in pyproject.toml
 git commit -am "release 0.1.1" && git push
 git tag v0.1.1 && git push --tags
 ```
