@@ -5,43 +5,53 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![CI](https://github.com/nennneko5787/opencode-zen-server/actions/workflows/ci.yml/badge.svg)](https://github.com/nennneko5787/opencode-zen-server/actions/workflows/ci.yml)
 
-OpenCode Zen の無料モデルだけを中継する、OpenAI 互換のリバースプロキシ。
+[English](README.md) | [日本語](README-ja.md)
 
-- **クライアントの API キーは何でもいい**（`sk-Whatever` でも空でも通る）。上流用の実キーはプロキシ側だけが保持します。
-- **モデルの一覧はハードコードしていません。** 無料かどうか・どの上流ルートで配信されるか・窓サイズ是多少かを、起動時に取得します。Zen が出した新しい無料モデルは、コードを書き換えずに現れます。
-- `/v1/models` に出るのは無料モデルのみ。有料モデルを叩くと 404 + 理由付き。
-- `/v1/models` には **実際の context window / 出力上限** も入ります（Zen 自身は id しか返さないため）。pi-web-ui の「補参数 / Enrich params」のように 200K を仮定するクライアントが、1M モデルで 12% しか使っていないのに圧縮してしまう事故を防げます。
-- Chat Completions / Responses / System One の 3 ルートを吸収し、素の OpenAI SDK・LiteLLM・Ollama・Continue などにそのまま差し込めます。
-- ストリーミング（SSE）はバイト単位で中継。バッファしません。
+An OpenAI-compatible reverse proxy in front of the free models on
+[OpenCode Zen](https://opencode.ai/docs/zen).
+
+- **The client's API key can be anything** — `sk-Whatever`, or none at all. The real
+  upstream key is held only by the proxy.
+- **No model is hardcoded.** Whether a model is free, which upstream route serves it,
+  and how large its window is are all read at startup, so a free model Zen launches
+  tomorrow appears without a code change.
+- `/v1/models` lists only free models. Ask for a paid one and you get a 404 that says why.
+- `/v1/models` also reports **real context windows and output limits** (Zen itself
+  returns ids and nothing else). This prevents the expensive kind of guess: clients that
+  default to 200K — pi-web-ui's "Enrich params", for one — compact a 1M model while it is
+  12% full.
+- Absorbs all three upstream routes (Chat Completions, Responses, System One), so the
+  plain OpenAI SDK, LiteLLM, Ollama, Continue and friends can point straight at it.
+- Streaming (SSE) is relayed byte for byte. Nothing is buffered.
 
 ---
 
-## インストール
+## Install
 
-PyPI から:
+From PyPI:
 
-```powershell
-# インストールして起動
+```bash
+# install, then run
 uv tool install zen-free-proxy
 zen-free-proxy
 
-# uv がなければ pip でも同じ
-py -m pip install zen-free-proxy
+# or with pip, if you don't use uv
+pip install zen-free-proxy
 zen-free-proxy
 ```
 
-インストールせずに動かす:
+Or run it without installing:
 
-```powershell
+```bash
 uvx zen-free-proxy
 ```
 
-リポジトリから開発するときは `uv sync` → `uv run zen-free-proxy` です。
+Working on a checkout instead? `uv sync`, then `uv run zen-free-proxy`.
 
-### 設定ファイル（任意）
+### Configuration file (optional)
 
-環境変数でも `.env` でも指定します（prefix は `ZEN_PROXY_`、`ZEN_API_KEY` のみ例外）。
-`.env` は起動時のカレントディレクトリから読み込まれます:
+Everything is an environment variable, or a `.env` file (the prefix is `ZEN_PROXY_`,
+except `ZEN_API_KEY`). `.env` is read from the working directory the server starts in:
 
 ```bash
 # .env
@@ -52,22 +62,22 @@ ZEN_PROXY_ALLOWED_CLIENT_KEYS=team-a-secret,team-b-secret
 
 ---
 
-## クイックスタート
+## Quick start
 
-```powershell
+```bash
 zen-free-proxy
 ```
 
-既定で `http://0.0.0.0:8787` で待ち受けます。
+It listens on `http://0.0.0.0:8787` by default.
 
-```powershell
-curl http://localhost:8787/v1/chat/completions `
-  -H "Content-Type: application/json" `
-  -H "Authorization: Bearer なんでもいい" `
+```bash
+curl http://localhost:8787/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer literally-anything" \
   -d '{"model":"space-bunny-free","messages":[{"role":"user","content":"hello"}]}'
 ```
 
-OpenAI SDK から:
+From the OpenAI SDK:
 
 ```python
 from openai import OpenAI
@@ -84,130 +94,128 @@ print(reply.choices[0].message.content)
 
 ---
 
-##  IMPORTANT: 無料モデルの実際利用可能範囲
+## IMPORTANT: what the free tier actually allows
 
-**2026-10 時点の実測: 無料モデルは全部、キー必須です。** 匿名（`Bearer public`）では
-`space-bunny-free` を含めすべて `403 FreeTierError` になります。
+**Measured in 2026-10: every free model needs a key.** Anonymous traffic
+(`Bearer public`) gets `403 FreeTierError` from all of them, `space-bunny-free`
+included.
 
-| モデル | 実キー無し（匿名） | 実キーあり |
+| Model | Anonymous (no key) | With a key |
 | --- | --- | --- |
-| `space-bunny-free` | ❌ `403 FreeTierError` | ✅ 動作 |
-| `jev-1.13-free`（`/v1/systemone`） | ❌ `403 FreeTierError` | ✅ 動作 |
-| `big-pickle`, `mimo-*`, `ling-*`, `nemotron-*`, `longcat-*`, `fledge-*`, `muse-spark-*-contributor-free` | ❌ `403 FreeTierError` | ✅ 動作 |
+| `space-bunny-free` | ❌ `403 FreeTierError` | ✅ works |
+| `jev-1.13-free` (on `/v1/systemone`) | ❌ `403 FreeTierError` | ✅ works |
+| `big-pickle`, `mimo-*`, `ling-*`, `nemotron-*`, `longcat-*`, `fledge-*`, `muse-spark-*-contributor-free` | ❌ `403 FreeTierError` | ✅ works |
 
-`GET /v1/models` だけは匿名でも通るので、モデル一覧の自動更新は匿名でも動きます。
+`GET /v1/models` is the exception — it answers anonymously, so the catalog keeps itself
+up to date either way.
 
-```powershell
-# .env に書く（.env.example をコピー）
+```bash
+# in .env (copy .env.example)
 ZEN_API_KEY=sk-...
 ```
 
-キーは <https://opencode.ai/auth> で取得できます。設定すると上流には
-`Authorization: Bearer <あなたのキー>` が送られ、クライアントのキーは一切
-上流へ漏れません。
+Get a key at <https://opencode.ai/auth>. Once set, upstream requests carry
+`Authorization: Bearer <your key>` and the client's own key is never forwarded.
 
-実キー無しで対象モデルを叩くと、プロキシは素の 403 ではなく
-`free_tier_restricted` というタイプで「`ZEN_API_KEY` を設定せよ」と明示した
-エラーを返します。
+Without a key, a request for a free model comes back as a `free_tier_restricted` error
+that names the fix (`set ZEN_API_KEY`) instead of a bare 403.
 
-### 「OpenCode 外で使うな」エラーとヘッダー
+### The "only from within OpenCode" error, and the headers
 
-`Error from provider (Console): OpenCode's free tier can only be used from within OpenCode`
-という 403 が返る件について。`opencode.exe`（bun コンパイル）を解析したところ、
-Zen 宛てに送られるアプリ固有ヘッダーは次の 4 つだけです（`x-opencode-*` はこれが全部）:
+Zen answers some free-tier rejections with
+`Error from provider (Console): OpenCode's free tier can only be used from within OpenCode`.
+Disassembling `opencode.exe` (a bun build) shows the app sends exactly four Zen-specific
+headers — that is the complete set of `x-opencode-*`:
 
 ```
 x-opencode-client: cli
 x-opencode-session: ses_…
 x-opencode-request: req_…
-User-Agent: opencode/<バージョン>
+User-Agent: opencode/<version>
 ```
 
-プロキシは既定でこれらをそのまま再生します（`ZEN_PROXY_ZEN_CLIENT_HEADERS=0` で無効化）。
-ただし実測した範囲では、**足しても 403 は消えません**。UA のみ / +client /
-+session +request / +project、`cli` `desktop` `web` の 6 通りを試しましたが全て同じ 403。
-一方、偽キーを付けると `401 Invalid API key`、キー無しだと有料モデルで
-`401 Missing API key` になります。つまり**判定しているのはヘッダーではなく API キー**で、
-解決は `ZEN_API_KEY` の設定です。ヘッダーは Zen がさらに検査を厳しくした時のための保険です。
+The proxy replays them verbatim by default (disable with `ZEN_PROXY_ZEN_CLIENT_HEADERS=0`).
+Within the range actually tested, **adding them does not remove the 403**: user agent only,
+`+client`, `+session +request`, `+project`, and all of `cli` / `desktop` / `web` were tried
+and every combination returned the same 403. On the other hand, a malformed key gives
+`401 Invalid API key` and no key gives `401 Missing API key` on paid models. So **Zen is
+checking the API key, not the headers**, and setting `ZEN_API_KEY` is the fix. The headers
+are kept as insurance in case Zen tightens the check further.
 
 ---
 
-## エンドポイント
+## Endpoints
 
-| メソッド | パス | 説明 |
+| Method | Path | Description |
 | --- | --- | --- |
-| `GET` | `/` | サービス情報と公開モデル一覧 |
-| `GET` | `/healthz` | 起動確認 + 上流到達性（`503` を返せば劣化） |
-| `GET` | `/v1/models` | 無料モデルのみ（OpenAI の形式 + 窓サイズ。下節） |
-| `GET` | `/v1/models/{id}` | 個別取得。有料/未知名は 404 + 理由 |
-| `POST` | `/v1/chat/completions` | メイン。ストリーミング可、tool calling 可 |
-| `POST` | `/v1/responses` | Responses API ネイティブの無料モデル用 |
-| `POST` | `/v1/systemone` | `jev-*` 用（OpenAI 形式ではない） |
+| `GET` | `/` | Service info and the list of served models |
+| `GET` | `/healthz` | Liveness + upstream reachability (`503` means degraded) |
+| `GET` | `/v1/models` | Free models only, in OpenAI's shape plus window sizes (below) |
+| `GET` | `/v1/models/{id}` | One model. Paid or unknown → 404 with the reason |
+| `POST` | `/v1/chat/completions` | The main one. Streaming and tool calling both work |
+| `POST` | `/v1/responses` | For free models that are native to the Responses API |
+| `POST` | `/v1/systemone` | For `jev-*` (not an OpenAI-shaped API) |
 
-モデル名には `opencode/` などのプロバイダ接頭辞が付けてもそのまま動きます
-（`opencode/space-bunny-free` → `space-bunny-free`）。
+Provider prefixes are accepted and stripped, so `opencode/space-bunny-free` works.
 
-### カタログの入手元（ハードコードなし）
+### Where the catalog comes from (nothing hardcoded)
 
-このリポジトリにはモデル id が 1 つも書かれていません。Zen が新しい無料モデルを
-公開したあとにコードを書き換えなくて済むよう、起動時と `ZEN_PROXY_CATALOG_TTL`
-秒ごとに次のソースを読みます。
+Not one model id appears in this repository. At startup, and every
+`ZEN_PROXY_CATALOG_TTL` seconds after that, the proxy reads:
 
-1. **`GET https://opencode.ai/zen/v1/models`** — Zen が現在扱っているモデルの一覧。
-   Zen が外したモデルはそのまま `/v1/models` から消え、Zen が出したモデルは自動で
-   追加されます。「このモデルを使ってよいか」の根拠はこの一覧です。
-2. **models.dev の `opencode` エントリ**（`https://models.dev/api.json`） — 本家
-   OpenCode クライアントが使っているカタログで、「無料かどうか」「どのルートで
-   配信されるか」「窓はいく大きいか」をこの 1 ファイルで答えられます。
+1. **`GET https://opencode.ai/zen/v1/models`** — what Zen is currently serving. A model
+   Zen drops disappears from `/v1/models` on its own, and a model Zen adds appears on its
+   own. This list is the only authority on whether a model may be used at all.
+2. **The `opencode` entry on models.dev** (`https://models.dev/api.json`) — the catalog
+   the official OpenCode client reads, which answers all three remaining questions:
 
-   | 知りたいこと | 見る場所 | opencode のソースでの根拠 |
+   | Question | Where to look | Why that is the right signal |
    | --- | --- | --- |
-   | 無料かどうか | `cost.input == 0` | `packages/core/src/provider/provider.ts` の `custom.opencode` が「未認証には有料モデルを隠す」判定に使う値 |
-   | どのルート | `provider.npm` が `@ai-sdk/openai` なら Responses API、省がなければ（プロバイダ既定の `@ai-sdk/openai-compatible`）chat | 同じファイルが `api.npm` から SDK を選ぶ部分 |
-   | 窓サイズ | `limit.context / input / output`、`modalities`、`reasoning` | 同じファイルが models.dev を読む部分 |
+   | Is it free? | `cost.input == 0` | `custom.opencode` in `packages/core/src/provider/provider.ts` uses the same value to hide paid models from unauthenticated callers |
+   | Which route? | `provider.npm`: `@ai-sdk/openai` is the Responses API; absent (the provider default `@ai-sdk/openai-compatible`) is chat | The same file picks its SDK from `api.npm` |
+   | How big? | `limit.context / input / output`, `modalities`, `reasoning` | The same file's models.dev reader |
 
-   無料かどうかは名前ではなく値段で判定します。無料なのに有料モデルらしい名前の
-   `big-pickle` も、`-free` が付いていて数百ドルかかるモデルも、名前の表に頼らず
-   正しい答えになります。
-3. **opencode のリポジトリにコミットされているスナップショット**（ミラー） —
-   `.github/workflows/models-snapshot.yml` が毎日更新して push する
-   `packages/core/src/models-dev/snapshot.txt`。上の models.dev が取れなかった
-   ときのフォールバックです（`ZEN_PROXY_MODELS_DEV_MIRROR_URL`）。中身はまったく
-   同じファイルで、実測ではこれ 1 つだけで 14 件の無料モデルと窓サイズまで揃います。
+   Free is therefore a price, not a name. `big-pickle` is free despite looking paid, and a
+   model with `-free` in its name that costs hundreds of dollars a million tokens is
+   correctly refused — no name table involved.
+3. **The snapshot opencode commits to its own repository** (mirror) —
+   `packages/core/src/models-dev/snapshot.txt`, refreshed daily by
+   `.github/workflows/models-snapshot.yml`. Used when models.dev itself is unreachable
+   (`ZEN_PROXY_MODELS_DEV_MIRROR_URL`). It is the same file: measured on its own, it yields
+   all 14 free models with their window sizes.
 
-どちらのソースも取れなかったときは、直前のカタログをそのまま使い続けます
-（15 分あけて再試行するので、推論リクエストのたびに取得に走ることはありません）。
-どのソースも把握していないモデルだけは、名前ベースの判定（`-free` など）に
-フォールバックします。
+If both sources are unreachable the previous catalog keeps being served, and the proxy
+retries on its own schedule (every 15 minutes) rather than on your inference requests. Only
+models no source has heard of fall back to name-based detection (`-free` and friends).
 
-### ルート自動振り分け
+### Route dispatch, and how it fixes itself
 
-Zen は無料モデルごとに上流エンドポイントが違います。上のカタログが教える
-「どのルートで配信されるか」に従って自動で振り分けます。
+Zen serves different free models on different upstream endpoints, and the catalog says
+which is which:
 
-- Chat Completions ネイティブ → そのまま中継
-- Responses ネイティブ → `chat/completions` に叩かれても要求を Responses 形式へ
-  変換して送り、応答（JSON / SSE とも）を Chat Completions 形式へ戻します。
-  `system` → `instructions`、`tool_calls` → `function_call`、
-  SSE の `response.output_text.delta` → `chat.completion.chunk` の delta に対応。
-- System One ネイティブ（`jev-*`）→ `POST /v1/systemone` 向け。models.dev に載って
-  いないので、名前でしか判別できません。
+- **Chat Completions native** → relayed as-is.
+- **Responses native** → a request to `/v1/chat/completions` is translated into a Responses
+  request, and the answer (JSON or SSE) is translated back: `system` → `instructions`,
+  `tool_calls` → `function_call`, and SSE `response.output_text.delta` → a
+  `chat.completion.chunk` delta.
+- **System One native** (`jev-*`) → served from `POST /v1/systemone`. models.dev does not
+  carry it at all, so the name is the only signal there is.
 
-ルートの当てが外れても止まりません。Zen が
-`Model X is not supported for format openai` と返した場合、もう一方の OpenAI 互換
-ルートで 1 回だけ試して、成功したルートをカタログに記録します。Zen が 500 で
-落ちる場合にそれを試すのは、名前からの推測で得たルートだけです。ソースが
-教えてくれたルートの 500 は本物の失敗なので、そのまま返します。
+A wrong route is not a dead end. When Zen answers
+`Model X is not supported for format openai`, the proxy tries the other OpenAI-compatible
+route once and records the route that worked. It also does that when Zen fails with a 5xx,
+but only when the route was a name-based guess — a 5xx on a route a source named is a real
+failure and is reported as one.
 
-つまり「モデルがルートを移った」「ソースの更新が遅れた」「名前からの推定が外れた」
-場合でも、最初の 1 リクエストが 2 本になるだけで、コードを直す必要はありません。
+So when Zen moves a model, a source lags behind, or a name guess turns out wrong, the cost
+is that one request goes out twice. No patch required.
 
-### `/v1/models` のメタデータ
+### `/v1/models` metadata
 
-context window も上の models.dev と同じ取得から来ます。ハードコード表は持たないので、
-Zen が無料モデルを新しく出した場合も窓サイズが自動で入ります。
+Context windows come from the same models.dev fetch as above. There is no table to go
+stale, so a newly launched free model arrives with its window already filled in.
 
-クライアントごとに綴りが違うので、まとめて出します:
+Clients spell this differently, so every size is published under all the names in use:
 
 ```jsonc
 {
@@ -215,123 +223,119 @@ Zen が無料モデルを新しく出した場合も窓サイズが自動で入�
   "object": "model",
   "owned_by": "opencode",
   "name": "Space Bunny Free",
-  "context_window": 1048576,        // pi-web-ui / vLLM 系
-  "context_length": 1048576,        // OpenRouter 系
+  "context_window": 1048576,        // pi-web-ui, vLLM-style clients
+  "context_length": 1048576,        // OpenRouter-style clients
   "max_context_length": 1048576,
   "max_input_tokens": 524288,
-  "max_tokens": 524288,             // OpenAI 系
+  "max_tokens": 524288,             // OpenAI-style clients
   "max_output_tokens": 524288,
   "modalities": ["text", "image", "video"],
   "reasoning": true,
-  "limit": { "context": 1048576, "input": 524288, "output": 524288 }  // models.dev 系
+  "limit": { "context": 1048576, "input": 524288, "output": 524288 }  // models.dev-style
 }
 ```
 
-取得に失敗した場合や models.dev に無いモデル（`jev-*` など）は、窓サイズ無しで
-そのまま配信されます。`ZEN_PROXY_MODELS_DEV_URL` と
-`ZEN_PROXY_MODELS_DEV_MIRROR_URL` の両方を空にすると、その取得自体を無効化できます
-（その場合、Zen の一覧と名前の判定だけでカタログを作ります）。
+If the fetch fails, or a model is missing from models.dev (`jev-*`, for instance), it is
+listed without a window. Set both `ZEN_PROXY_MODELS_DEV_URL` and
+`ZEN_PROXY_MODELS_DEV_MIRROR_URL` to empty to turn that fetch off entirely; the catalog is
+then built from Zen's list plus name detection alone.
 
-`pi-web-ui` の「补参数（Enrich params）」は外部カタログ（OpenRouter → models.dev）を
-引く仕組みで、Zen の無料モデルは **どちらのカタログにも一致しません**。実際に効くのは
-`/v1/models` で、pi-web-ui 側の `server/model-admin.ts` の `parseOpenAiModel` が
-そのレスポンスのフィールドを読みます。ただし pi-web-ui は **手動で入れた値を優先し、
-Enrich は空欄しか埋めない**ため、200K を入れてある行は一度消してから取り直してください。
+`pi-web-ui`'s "Enrich params" pulls from external catalogs (OpenRouter, then models.dev),
+and **Zen's free models are in neither**. What actually works is `/v1/models`, because
+pi-web-ui's `server/model-admin.ts` (`parseOpenAiModel`) reads those fields from the
+response. Note that pi-web-ui **prefers manual values and only enriches blanks**, so delete
+a row you filled in with 200K before fetching it again.
 
 ---
 
-## 設定
+## Settings
 
-すべて環境変数、または `.env` で指定します（_prefix は `ZEN_PROXY_`、ただし
-`ZEN_API_KEY` のみ例外）。
+Everything is an environment variable, or a `.env` file (prefix `ZEN_PROXY_`, except
+`ZEN_API_KEY`).
 
-| 変数 | 既定 | 説明 |
+| Variable | Default | Description |
 | --- | --- | --- |
-| `ZEN_API_KEY` | *(空)* | 上流に送る実キー。空なら匿名（`Bearer public`） |
-| `ZEN_PROXY_HOST` | `0.0.0.0` | バインド先 |
-| `ZEN_PROXY_PORT` | `8787` | ポート |
-| `ZEN_PROXY_ZEN_BASE_URL` | `https://opencode.ai/zen/v1` | 上流 |
-| `ZEN_PROXY_REQUEST_TIMEOUT` | `600` | 上流タイムアウト(秒) |
-| `ZEN_PROXY_CONNECT_TIMEOUT` | `15` | 接続タイムアウト(秒) |
-| `ZEN_PROXY_MAX_RETRIES` | `2` | 429/5xx の再試行回数（`Retry-After` 考慮） |
-| `ZEN_PROXY_CATALOG_TTL` | `900` | カタログ（モデル一覧・ルート・窓サイズ）の再取得間隔。`0` で「起動時に 1 回だけ取得」 |
-| `ZEN_PROXY_MODELS_DEV_URL` | `https://models.dev/api.json` | カタログ（判定・ルート・窓サイズ）の取得元。空で無効化 |
-| `ZEN_PROXY_MODELS_DEV_MIRROR_URL` | opencode の `models-dev/snapshot.txt` | 上の取得元が使えないときのミラー。空で無効化 |
-| `ZEN_PROXY_ZEN_CLIENT_HEADERS` | `1` | 本番クライアントの `x-opencode-*` と User-Agent を上流に再生する |
-| `ZEN_PROXY_ALLOWED_CLIENT_KEYS` | *(空)* | **空 = 誰でも通過。** カンマ区切りで指定すると、そのキーだけ受理 |
-| `ZEN_PROXY_LOG_LEVEL` | `INFO` | ログレベル |
+| `ZEN_API_KEY` | *(empty)* | Real key sent upstream. Empty means anonymous (`Bearer public`) |
+| `ZEN_PROXY_HOST` | `0.0.0.0` | Bind address |
+| `ZEN_PROXY_PORT` | `8787` | Port |
+| `ZEN_PROXY_ZEN_BASE_URL` | `https://opencode.ai/zen/v1` | Upstream |
+| `ZEN_PROXY_REQUEST_TIMEOUT` | `600` | Upstream timeout (seconds) |
+| `ZEN_PROXY_CONNECT_TIMEOUT` | `15` | Connect timeout (seconds) |
+| `ZEN_PROXY_MAX_RETRIES` | `2` | Retries for 429/5xx (honouring `Retry-After`) |
+| `ZEN_PROXY_CATALOG_TTL` | `900` | How often to re-read the catalog (model list, routes, windows). `0` fetches once at startup |
+| `ZEN_PROXY_MODELS_DEV_URL` | `https://models.dev/api.json` | Catalog source (free-ness, routes, windows). Empty disables it |
+| `ZEN_PROXY_MODELS_DEV_MIRROR_URL` | opencode's `models-dev/snapshot.txt` | Mirror used when the source above is unavailable. Empty disables it |
+| `ZEN_PROXY_ZEN_CLIENT_HEADERS` | `1` | Replay the official client's `x-opencode-*` headers and User-Agent upstream |
+| `ZEN_PROXY_ALLOWED_CLIENT_KEYS` | *(empty)* | **Empty = anyone gets in.** A comma separated list means only those keys are accepted |
+| `ZEN_PROXY_LOG_LEVEL` | `INFO` | Log level |
 
-### 認証について
+### Authentication
 
-既定は**完全なオープン**です。クライアントの `Authorization` ヘッダは
-読みも検証もせず、上流へ転送しません（「API キー何でも通る」要件）。
-共有先将誰かのキーを渡す必要もありません。
+The default is **completely open**: the client's `Authorization` header is neither read
+nor validated, and is never forwarded upstream. You do not have to hand anyone a key.
 
-後から認証を強めたいときは:
+To require authentication later:
 
-```powershell
-$env:ZEN_PROXY_ALLOWED_CLIENT_KEYS = "team-a-secret,team-b-secret"
+```bash
+export ZEN_PROXY_ALLOWED_CLIENT_KEYS="team-a-secret,team-b-secret"
 ```
 
-とすると、指定したキーのどれかを持つリクエストだけが通ります。
+Only requests carrying one of those keys are then accepted.
 
-> ⚠️ バインドは既定で `0.0.0.0` かつ無認証です。LAN や公開先将想定する場合は
-> `ZEN_PROXY_HOST=127.0.0.1` にするか、`ZEN_PROXY_ALLOWED_CLIENT_KEYS` を
-> 設定してください。
+> ⚠️ The default bind is `0.0.0.0` with no authentication. If this is reachable from a LAN
+> or the internet, set `ZEN_PROXY_HOST=127.0.0.1` or configure `ZEN_PROXY_ALLOWED_CLIENT_KEYS`.
 
 ---
 
-## 開発
+## Development
 
-```powershell
-uv run pytest -q          # 115 tests
+```bash
+uv run pytest -q          # 119 tests
 uv run ruff check .
 uv run ruff format .
 ```
 
-テストは全て `httpx.MockTransport` で上游をモックしています。実ネットワークに
-アクセスしません。
+The tests mock the upstream with `httpx.MockTransport` and never touch the network.
 
-### リリース
+Layout:
 
-PyPI へは Trusted Publishing で公開しています（API トークンを持っていません）。
-`v*` タグを push すると、CI を通って自動でアップロードされます:
+```
+src/zen_free_proxy/
+  config.py     environment variables -> Settings
+  catalog.py    the free-model catalog and the window types (ModelMeta / CatalogSource)
+  models_dev.py reads free-ness, routes and window sizes out of models.dev
+  upstream.py   HTTP client for Zen (retries, catalog refresh, client headers)
+  sse.py        SSE framing
+  bridge.py     Chat Completions <-> Responses API conversion
+  app.py        the FastAPI routes
+```
 
-```powershell
-uv version patch          # 0.1.0 -> 0.1.1（pyproject を更新）
+### Releasing
+
+Publishing to PyPI goes through Trusted Publishing, so there is no API token stored
+anywhere. Push a `v*` tag and CI uploads the release:
+
+```bash
+uv version patch          # 0.1.0 -> 0.1.1 in pyproject.toml
 git commit -am "release 0.1.1" && git push
 git tag v0.1.1 && git push --tags
 ```
 
-初回の公開時だけ、PyPI 側に一度だけ発行者の登録が必要です:
-<https://pypi.org/manage/project/zen-free-proxy/settings/publishing> で
-「GitHub のリポジトリ `nennneko5787/opencode-zen-server`、ワークフロー
-`publish.yml`、 Environments は空欄」を登録します。
-
-構成:
-
-```
-src/zen_free_proxy/
-  config.py     環境変数 → Settings
-  catalog.py    無料モデルのカタログと窓の型（ModelMeta / CatalogSource）。id は持たない
-  models_dev.py models.dev から無料判定・ルート・窓サイズを取得・解析
-  upstream.py   Zen への HTTP クライアント（再試行・カタログ更新・クライアントヘッダー）
-  sse.py        SSE のフレーミング
-  bridge.py     Chat Completions ⇄ Responses API の相互変換
-  app.py        FastAPI のルート定義
-```
+Only the very first release needed a one-time publisher registration on PyPI, at
+<https://pypi.org/manage/project/zen-free-proxy/settings/publishing>.
 
 ---
 
-## 免責
+## Disclaimer
 
-- Zen の無料モデルは「期間限定」的ライセンスで、勝手に入れ替わったり消えたりします。
-  あれこれリストを直す必要はありません。カタログは起動時に取得します
-  （下記「カタログの入手元」）。新しいモデルが出ても、古いモデルが消えても、
-  そのまま追従します。
-- 無料ティールの利用制限（レートリミット等）は Zen 側にあり、このプロキシでは
-  回避しません。429 は `Retry-After` を付けてそのままクライアントに返します。
-  無料モデルの公開範囲も Zen 側の判断で、匿名利用は 403 になります（上記のとおり）。
-- `muse-spark-*-contributor-free` と一部無料モデルは、プライバシー上の理由
-  （学習利用への同意など）でプロンプトが保存されます。機密情報を扱う場合は
-  `space-bunny-free` / `longcat-2.5-preview-free`（ゼロレテンション）を選んでください。
+- Zen's free models are licensed on a "for a limited time" basis and may be swapped or
+  withdrawn. There is no list to maintain: the catalog is read at startup (see
+  [Where the catalog comes from](#where-the-catalog-comes-from-nothing-hardcoded)), so new
+  models and retired ones are followed automatically.
+- Free-tier limits (rate limits and the like) live on Zen's side and this proxy does not
+  try to work around them. A 429 is passed through with its `Retry-After` header. Which
+  models are free, and whether anonymous traffic is allowed, is Zen's decision too — see
+  above.
+- `muse-spark-*-contributor-free` and some other free models keep your prompts for
+  privacy reasons such as training consent. For anything sensitive, prefer
+  `space-bunny-free` or `longcat-2.5-preview-free` (zero retention).
